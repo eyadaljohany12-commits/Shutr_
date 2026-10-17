@@ -1,435 +1,697 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>شطر - SHATR</title>
+<style>
+  :root {
+    --bg-dark: #1a1a2e;
+    --bg-darker: #0f0f1e;
+    --bg-panel: #16213e;
+    --red-glow: #e94560;
+    --red: #c23152;
+    --white-soft: #eaeaea;
+    --accent: #f39c12;
+    --light-square: #f0d9b5;
+    --dark-square: #b58863;
+    --font: 'Segoe UI', Tahoma, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background: linear-gradient(135deg, var(--bg-darker), var(--bg-dark));
+    color: var(--white-soft);
+    min-height: 100vh;
+    padding: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .app {
+    width: 100%; max-width: 1100px;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 16px;
+  }
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+  }
+  .header {
+    grid-column: 1 / -1;
+    padding: 4px 0;
+  }
+  .header h1 {
+    font-size: 28px;
+    background: linear-gradient(90deg, var(--red-glow), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 800;
+    letter-spacing: 2px;
+  }
+  .status-bar {
+    grid-column: 1 / -1;
+    padding: 10px 16px;
+    background: var(--bg-panel);
+    border-radius: 10px;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+    border: 1px solid rgba(233,69,96,0.2);
+  }
+  .board-wrap {
+    background: var(--bg-panel);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    aspect-ratio: 1;
+    border-radius: 6px;
+    overflow: hidden;
+    user-select: none;
+    font-size: clamp(22px, 5.5vmin, 52px);
+  }
+  @media (min-width: 900px) {
+    #board { font-size: clamp(32px, 3.6vw, 52px); }
+  }
+  .square {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    font-size: 1em;
+    line-height: 1;
+  }
+  .square.light { background: var(--light-square); }
+  .square.dark { background: var(--dark-square); }
+  .square.last-move { box-shadow: inset 0 0 0 3px rgba(243,156,18,0.7); }
+  .square.selected { box-shadow: inset 0 0 0 3px rgba(233,69,96,0.9); }
+  .square.check-king { background: radial-gradient(circle, #ff5555, #b30000) !important; }
+  .square.legal-move::after {
+    content: ''; position: absolute;
+    width: 28%; height: 28%;
+    background: rgba(0,0,0,0.28);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .square.legal-move.capture::after {
+    width: 90%; height: 90%;
+    background: transparent;
+    border: 4px solid rgba(233,69,96,0.7);
+    border-radius: 50%;
+  }
+  .piece {
+    position: relative; z-index: 1;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.35);
+    transition: transform 0.15s;
+  }
+  .piece.white { color: #fff; -webkit-text-stroke: 1px #333; }
+  .piece.black { color: #1a1a1a; -webkit-text-stroke: 1px #000; }
+  .square:hover .piece { transform: scale(1.05); }
+  .panel {
+    background: var(--bg-panel);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .btn {
+    background: linear-gradient(135deg, var(--red), var(--red-glow));
+    color: white;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 600;
+    transition: transform 0.1s, opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.9; }
+  .btn:active { transform: scale(0.97); }
+  .btn.secondary {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .panel h3 {
+    font-size: 13px; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--accent);
+    margin-bottom: 6px; padding-bottom: 6px;
+    border-bottom: 1px solid rgba(243,156,18,0.2);
+  }
+  .move-list {
+    max-height: 240px; overflow-y: auto;
+    background: var(--bg-darker);
+    border-radius: 6px; padding: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px; direction: ltr;
+  }
+  .move-row {
+    display: grid; grid-template-columns: 40px 1fr 1fr;
+    padding: 3px 6px; border-radius: 4px;
+  }
+  .move-row:nth-child(odd) { background: rgba(255,255,255,0.03); }
+  .move-num { color: #888; }
+  .move-san { color: var(--white-soft); padding: 0 8px; }
+  .stats-row {
+    display: flex; justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 14px;
+  }
+  .stats-row span:last-child { color: var(--accent); font-weight: 700; }
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 100; padding: 16px;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--bg-panel);
+    border-radius: 14px; padding: 20px;
+    max-width: 420px; width: 100%;
+    border: 1px solid rgba(233,69,96,0.3);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  .modal h2 { margin-bottom: 16px; color: var(--accent); font-size: 18px; }
+  .modal .btn { width: 100%; margin-top: 10px; }
+  .toggle-row {
+    display: flex; justify-content: space-between;
+    align-items: center; padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .toggle {
+    width: 50px; height: 26px;
+    border-radius: 13px;
+    background: rgba(255,255,255,0.15);
+    position: relative; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle::after {
+    content: ''; position: absolute;
+    top: 3px; left: 3px;
+    width: 20px; height: 20px;
+    border-radius: 50%; background: white;
+    transition: transform 0.2s;
+  }
+  .toggle.on { background: var(--red-glow); }
+  .toggle.on::after { transform: translateX(24px); }
+  .input {
+    background: var(--bg-darker);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--white-soft);
+    padding: 10px; border-radius: 8px;
+    width: 100%; font-family: var(--font);
+    font-size: 14px; margin-top: 6px;
+  }
+  .promotion-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 10px; margin-top: 10px;
+  }
+  .promo-btn {
+    font-size: 36px; padding: 12px;
+    background: var(--bg-darker);
+    border: 2px solid rgba(243,156,18,0.3);
+    border-radius: 10px;
+    color: var(--white-soft);
+    cursor: pointer;
+    transition: all 0.15s; line-height: 1;
+  }
+  .promo-btn:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .game-over-modal .modal { text-align: center; border-color: var(--accent); }
+  .game-over-title { font-size: 28px; color: var(--accent); margin-bottom: 8px; font-weight: 800; }
+  .game-over-sub { font-size: 16px; margin-bottom: 16px; }
+  .fen-box {
+    background: var(--bg-darker); padding: 8px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px; word-break: break-all;
+    color: #aaa; direction: ltr; text-align: left;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header"><h1 data-i18n="appName">شطر</h1></header>
+  <div class="status-bar" id="statusText">دور الأبيض</div>
+
+  <div class="board-wrap"><div id="board"></div></div>
+
+  <aside class="panel">
+    <div class="btn-grid">
+      <button class="btn" id="btnNewGame" data-i18n="newGame">لعبة جديدة</button>
+      <button class="btn secondary" id="btnNewRandom" data-i18n="newRandom">🎲 موقع عشوائي</button>
+      <button class="btn secondary" id="btnFlip" data-i18n="flip">🔄 قلب الرقعة</button>
+      <button class="btn secondary" id="btnUndo" data-i18n="undo">↩️ تراجع</button>
+      <button class="btn secondary" id="btnSettings" data-i18n="settings">الإعدادات</button>
+      <button class="btn secondary" id="btnStats" data-i18n="stats">الإحصائيات</button>
+    </div>
+    <div>
+      <h3 data-i18n="moveHistory">سجل النقلات</h3>
+      <div class="move-list" id="moveList"></div>
+    </div>
+    <div class="stats-row"><span data-i18n="moves">النقلات</span><span id="statMoves">0</span></div>
+    <div class="stats-row"><span data-i18n="positionId">رقم الموقع</span><span id="statPosition">518</span></div>
+  </aside>
+</div>
+
+<!-- النوافذ المنبثقة -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2 data-i18n="settings">الإعدادات</h2>
+    <div class="toggle-row">
+      <span data-i18n="language">اللغة</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:12px">AR</span>
+        <div class="toggle on" id="langToggle"></div>
+        <span style="font-size:12px">EN</span>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <span data-i18n="sound">المؤثرات الصوتية</span>
+      <div class="toggle on" id="soundToggle"></div>
+    </div>
+    <div class="toggle-row" style="border:none;display:block">
+      <span data-i18n="positionId">رقم الموقع (0-959)</span>
+      <input class="input" type="number" id="posInput" min="0" max="959" value="518">
+      <button class="btn" id="btnLoadPos" data-i18n="load">تحميل</button>
+    </div>
+    <button class="btn secondary" id="btnCloseSettings">✕</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="statsModal">
+  <div class="modal">
+    <h2 data-i18n="statistics">الإحصائيات</h2>
+    <div class="stats-row"><span data-i18n="totalMoves">إجمالي النقلات</span><span id="statsTotal">0</span></div>
+    <div class="stats-row"><span data-i18n="whiteMoves">نقلات الأبيض</span><span id="statsWhite">0</span></div>
+    <div class="stats-row"><span data-i18n="blackMoves">نقلات الأسود</span><span id="statsBlack">0</span></div>
+    <div class="stats-row" style="display:block;border:none">
+      <div data-i18n="currentPosition" style="margin-bottom:6px">الموقع الحالي (FEN)</div>
+      <div class="fen-box" id="statsFen"></div>
+    </div>
+    <button class="btn secondary" id="btnCloseStats">✕</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="promotionModal">
+  <div class="modal">
+    <h2 data-i18n="promotion">اختر قطعة الترقية</h2>
+    <div class="promotion-grid">
+      <button class="promo-btn" data-piece="q">♛</button>
+      <button class="promo-btn" data-piece="r">♜</button>
+      <button class="promo-btn" data-piece="b">♝</button>
+      <button class="promo-btn" data-piece="n">♞</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay game-over-modal" id="gameOverScreen">
+  <div class="modal">
+    <div class="game-over-title" id="gameOverTitle">كش مات!</div>
+    <div class="game-over-sub" id="gameOverSub">فاز الأبيض</div>
+    <button class="btn" id="btnPlayAgain" data-i18n="playAgain">العب مرة أخرى</button>
+  </div>
+</div>
+
 <script type="module">
-  // 1. استيراد مكتبة chess.js المستقرة (التي تدعم Chess 960)
-  import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.4.0/+esm';
+import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.4.0/+esm';
 
-  /* ==================== الحالة العامة ==================== */
-  const state = {
-    game: null,              // كائن Chess الحالي
-    fen: '',
-    selectedSquare: null,
-    legalMoves: [],
-    orientation: 'white',
-    lastMove: null,
-    gameOver: false,
-    positionId: 518,
-    soundEnabled: true,
-    lang: 'ar',
-    moveCount: 0,
-    whiteMoves: 0,
-    blackMoves: 0,
-    moveHistory: []
-  };
+const state = {
+  game: null, fen: '', selectedSquare: null, legalMoves: [],
+  orientation: 'white', lastMove: null, gameOver: false,
+  positionId: 518, soundEnabled: true, lang: 'ar',
+  moveCount: 0, whiteMoves: 0, blackMoves: 0, moveHistory: []
+};
 
-  /* ==================== الترجمة (كما هي) ==================== */
-  const i18n = {
-    ar: {
-      appName: 'شطر', newGame: 'لعبة جديدة', settings: 'الإعدادات', stats: 'الإحصائيات', statistics: 'الإحصائيات',
-      gameStatus: 'حالة اللعبة', whiteTurn: 'دور الأبيض', blackTurn: 'دور الأسود', moves: 'النقلات',
-      positionId: 'رقم الموقع', moveHistory: 'سجل النقلات', flip: '🔄 قلب الرقعة', undo: '↩️ تراجع',
-      newRandom: '🎲 موقع عشوائي', playAgain: 'العب مرة أخرى', language: 'اللغة', arabic: 'العربية', english: 'English',
-      boardTheme: 'سمة الرقعة', redWhite: 'أحمر / أبيض', sound: 'المؤثرات الصوتية', soundOn: 'مفعّلة', soundOff: 'معطّلة',
-      load: 'تحميل', totalMoves: 'إجمالي النقلات', whiteMoves: 'نقلات الأبيض', blackMoves: 'نقلات الأسود',
-      currentPosition: 'الموقع الحالي (FEN)', promotion: 'اختر قطعة الترقية', check: 'كش!', checkmate: 'كش مات!',
-      stalemate: 'تعادل - طريق مسدود', whiteWins: 'فاز الأبيض', blackWins: 'فاز الأسود', draw: 'تعادل', invalidMove: 'نقلة غير قانونية'
-    },
-    en: {
-      appName: 'SHATR', newGame: 'New Game', settings: 'Settings', stats: 'Statistics', statistics: 'Statistics',
-      gameStatus: 'Game Status', whiteTurn: "White's Turn", blackTurn: "Black's Turn", moves: 'Moves',
-      positionId: 'Position ID', moveHistory: 'Move History', flip: '🔄 Flip Board', undo: '↩️ Undo',
-      newRandom: '🎲 Random Position', playAgain: 'Play Again', language: 'Language', arabic: 'العربية', english: 'English',
-      boardTheme: 'Board Theme', redWhite: 'Red / White', sound: 'Sound Effects', soundOn: 'On', soundOff: 'Off',
-      load: 'Load', totalMoves: 'Total Moves', whiteMoves: 'White Moves', blackMoves: 'Black Moves',
-      currentPosition: 'Current Position (FEN)', promotion: 'Choose Promotion', check: 'Check!', checkmate: 'Checkmate!',
-      stalemate: 'Stalemate', whiteWins: 'White Wins', blackWins: 'Black Wins', draw: 'Draw', invalidMove: 'Invalid move'
-    }
-  };
-
-  /* ==================== عناصر DOM ==================== */
-  const boardEl = document.getElementById('board');
-  const statusText = document.getElementById('statusText');
-  const statMoves = document.getElementById('statMoves');
-  const statPosition = document.getElementById('statPosition');
-  const moveListEl = document.getElementById('moveList');
-  const gameOverScreen = document.getElementById('gameOverScreen');
-  const gameOverTitle = document.getElementById('gameOverTitle');
-  const gameOverSub = document.getElementById('gameOverSub');
-
-  const PIECE_UNICODE = {
-    'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'p': '♟',
-    'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'
-  };
-
-  /* ==================== دوال مساعدة ==================== */
-  function t(key) { return i18n[state.lang][key] || key; }
-
-  function updateI18n() {
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-      const key = el.getAttribute('data-i18n');
-      if (i18n[state.lang][key]) el.textContent = i18n[state.lang][key];
-    });
-    document.querySelectorAll('[data-i18n-title]').forEach(el => {
-      const key = el.getAttribute('data-i18n-title');
-      if (i18n[state.lang][key]) el.title = i18n[state.lang][key];
-    });
-    document.documentElement.lang = state.lang;
-    document.documentElement.dir = state.lang === 'ar' ? 'rtl' : 'ltr';
-    updateStatus();
+const i18n = {
+  ar: {
+    appName: 'شطر', newGame: 'لعبة جديدة', settings: 'الإعدادات', stats: 'الإحصائيات', statistics: 'الإحصائيات',
+    gameStatus: 'حالة اللعبة', whiteTurn: 'دور الأبيض', blackTurn: 'دور الأسود', moves: 'النقلات',
+    positionId: 'رقم الموقع', moveHistory: 'سجل النقلات', flip: '🔄 قلب الرقعة', undo: '↩️ تراجع',
+    newRandom: '🎲 موقع عشوائي', playAgain: 'العب مرة أخرى', language: 'اللغة', arabic: 'العربية', english: 'English',
+    sound: 'المؤثرات الصوتية', load: 'تحميل', totalMoves: 'إجمالي النقلات', whiteMoves: 'نقلات الأبيض',
+    blackMoves: 'نقلات الأسود', currentPosition: 'الموقع الحالي (FEN)', promotion: 'اختر قطعة الترقية',
+    check: 'كش!', checkmate: 'كش مات!', stalemate: 'تعادل - طريق مسدود',
+    whiteWins: 'فاز الأبيض', blackWins: 'فاز الأسود', draw: 'تعادل', invalidMove: 'نقلة غير قانونية'
+  },
+  en: {
+    appName: 'SHATR', newGame: 'New Game', settings: 'Settings', stats: 'Statistics', statistics: 'Statistics',
+    gameStatus: 'Game Status', whiteTurn: "White's Turn", blackTurn: "Black's Turn", moves: 'Moves',
+    positionId: 'Position ID', moveHistory: 'Move History', flip: '🔄 Flip Board', undo: '↩️ Undo',
+    newRandom: '🎲 Random Position', playAgain: 'Play Again', language: 'Language', arabic: 'العربية', english: 'English',
+    sound: 'Sound Effects', load: 'Load', totalMoves: 'Total Moves', whiteMoves: 'White Moves',
+    blackMoves: 'Black Moves', currentPosition: 'Current Position (FEN)', promotion: 'Choose Promotion',
+    check: 'Check!', checkmate: 'Checkmate!', stalemate: 'Stalemate',
+    whiteWins: 'White Wins', blackWins: 'Black Wins', draw: 'Draw', invalidMove: 'Invalid move'
   }
+};
 
-  /* ==================== توليد Chess 960 (بديل لدالة المكتبة القديمة) ==================== */
-  function generateChess960Fen(id) {
-    // خوارزمية Scharnagl لتوليد مواقع Chess 960
-    let n = id;
-    const pieces = new Array(8).fill(null);
-    // 1. وضع الفيلين على لونين مختلفين
-    const lightSquares = [1, 3, 5, 7]; // المربعات الفاتحة (b,d,f,h) بترقيم 0-7
-    const darkSquares = [0, 2, 4, 6];  // المربعات الداكنة (a,c,e,g)
-    pieces[lightSquares[n % 4]] = 'B'; n = Math.floor(n / 4);
-    pieces[darkSquares[n % 4]] = 'B'; n = Math.floor(n / 4);
-    // 2. وضع الوزير في أحد المربعات المتبقية
-    const emptySquares = [];
-    for (let i = 0; i < 8; i++) if (!pieces[i]) emptySquares.push(i);
-    pieces[emptySquares[n % 6]] = 'Q'; n = Math.floor(n / 6);
-    // 3. وضع الحصانين في المربعات المتبقية
-    const remaining = [];
-    for (let i = 0; i < 8; i++) if (!pieces[i]) remaining.push(i);
-    const n1 = n % 10; // 5 choose 2 = 10
-    const n2 = Math.floor(n / 10);
-    pieces[remaining[n1]] = 'N';
-    const remaining2 = [];
-    for (let i = 0; i < 8; i++) if (!pieces[i]) remaining2.push(i);
-    pieces[remaining2[n2]] = 'N';
-    // 4. وضع القلعة والملك والقلعة في المربعات الثلاثة المتبقية
-    const last3 = [];
-    for (let i = 0; i < 8; i++) if (!pieces[i]) last3.push(i);
-    pieces[last3[0]] = 'R';
-    pieces[last3[1]] = 'K';
-    pieces[last3[2]] = 'R';
-    // بناء FEN
-    const row = pieces.join('');
-    return `${row.toLowerCase()}/pppppppp/8/8/8/8/PPPPPPPP/${row} w KQkq - 0 1`;
-  }
+const boardEl = document.getElementById('board');
+const statusText = document.getElementById('statusText');
+const statMoves = document.getElementById('statMoves');
+const statPosition = document.getElementById('statPosition');
+const moveListEl = document.getElementById('moveList');
+const gameOverScreen = document.getElementById('gameOverScreen');
+const gameOverTitle = document.getElementById('gameOverTitle');
+const gameOverSub = document.getElementById('gameOverSub');
 
-  /* ==================== عرض الرقعة ==================== */
-  function renderBoard() {
-    if (!state.game) return;
-    const board = state.game.board(); // chess.js board: [rank 8 ... rank 1]
-    boardEl.innerHTML = '';
-    const isWhite = state.orientation === 'white';
-    const rankOrder = isWhite ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
-    const fileOrder = isWhite ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
+const PIECE_UNICODE = {
+  'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'p': '♟',
+  'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'
+};
 
-    // كشف الملك المكشوك
-    let checkSquare = null;
-    if (state.game.isCheck()) {
-      const turn = state.game.turn();
-      const king = turn === 'w' ? 'K' : 'k';
-      for (let r = 0; r < 8; r++) {
-        for (let c = 0; c < 8; c++) {
-          if (board[r][c] && board[r][c].type.toUpperCase() === 'K' && board[r][c].color === turn) {
-            checkSquare = { row: r, col: c };
-          }
-        }
-      }
-    }
+function t(key) { return i18n[state.lang][key] || key; }
 
-    for (const r of rankOrder) {
-      for (const c of fileOrder) {
-        const square = document.createElement('div');
-        const isLight = (r + c) % 2 === 0;
-        square.className = `square ${isLight ? 'light' : 'dark'}`;
-        square.dataset.row = r;
-        square.dataset.col = c;
-        square.dataset.square = String.fromCharCode(97 + c) + (8 - r);
-
-        if (state.lastMove) {
-          if (state.lastMove.from === square.dataset.square || state.lastMove.to === square.dataset.square) {
-            square.classList.add('last-move');
-          }
-        }
-        if (state.selectedSquare === square.dataset.square) square.classList.add('selected');
-        if (checkSquare && checkSquare.row === r && checkSquare.col === c) square.classList.add('check-king');
-
-        const piece = board[r][c];
-        if (piece) {
-          const span = document.createElement('span');
-          span.className = `piece ${piece.color === 'w' ? 'white' : 'black'}`;
-          span.textContent = PIECE_UNICODE[piece.color === 'w' ? piece.type.toUpperCase() : piece.type] || '';
-          square.appendChild(span);
-        }
-
-        if (state.selectedSquare) {
-          const isLegal = state.legalMoves.some(m => m.to === square.dataset.square);
-          if (isLegal) {
-            square.classList.add('legal-move');
-            if (piece) square.classList.add('capture');
-          }
-        }
-
-        square.addEventListener('click', () => onSquareClick(square.dataset.square));
-        boardEl.appendChild(square);
-      }
-    }
-
-    const statsFen = document.getElementById('statsFen');
-    if (statsFen) statsFen.textContent = state.fen;
-  }
-
-  /* ==================== النقر على مربع ==================== */
-  function onSquareClick(square) {
-    if (state.gameOver) return;
-
-    if (state.selectedSquare) {
-      const move = state.legalMoves.find(m => m.to === square);
-      if (move) {
-        if (move.promotion) {
-          showPromotionModal(move);
-          return;
-        }
-        executeMove(move);
-        return;
-      }
-    }
-
-    const piece = state.game.get(square);
-    if (piece && piece.color === state.game.turn()) {
-      state.selectedSquare = square;
-      state.legalMoves = state.game.moves({ square: square, verbose: true });
-      renderBoard();
-    } else {
-      state.selectedSquare = null;
-      state.legalMoves = [];
-      renderBoard();
-    }
-  }
-
-  /* ==================== نافذة الترقية ==================== */
-  let pendingPromotionMove = null;
-  function showPromotionModal(move) {
-    pendingPromotionMove = move;
-    document.getElementById('promotionModal').classList.add('active');
-  }
-
-  document.querySelectorAll('.promo-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (pendingPromotionMove) {
-        const move = state.game.moves({ verbose: true }).find(m =>
-          m.from === pendingPromotionMove.from && m.to === pendingPromotionMove.to && m.promotion === btn.dataset.piece
-        );
-        if (move) executeMove(move);
-      }
-      document.getElementById('promotionModal').classList.remove('active');
-      pendingPromotionMove = null;
-    });
+function updateI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (i18n[state.lang][key]) el.textContent = i18n[state.lang][key];
   });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const key = el.getAttribute('data-i18n-title');
+    if (i18n[state.lang][key]) el.title = i18n[state.lang][key];
+  });
+  document.documentElement.lang = state.lang;
+  document.documentElement.dir = state.lang === 'ar' ? 'rtl' : 'ltr';
+  updateStatus();
+}
 
-  /* ==================== تنفيذ النقلة ==================== */
-  function executeMove(move) {
-    try {
-      const result = state.game.move({ from: move.from, to: move.to, promotion: move.promotion || 'q' });
-      if (!result) throw new Error('Invalid move');
+/* ✅ توليد Chess 960 (Scharnagl) بشكل صحيح */
+function generateChess960Fen(id) {
+  let n = id;
+  const pieces = new Array(8).fill(null);
 
-      state.fen = state.game.fen();
-      state.lastMove = { from: move.from, to: move.to };
-      state.selectedSquare = null;
-      state.legalMoves = [];
-      state.moveCount++;
+  // 1. الفيلان على لونين مختلفين
+  const light = [1, 3, 5, 7], dark = [0, 2, 4, 6];
+  pieces[light[n % 4]] = 'B'; n = Math.floor(n / 4);
+  pieces[dark[n % 4]]  = 'B'; n = Math.floor(n / 4);
 
-      const turn = state.game.turn();
-      if (turn === 'b') state.whiteMoves++;
-      else state.blackMoves++;
+  // 2. الوزير
+  const empty = [];
+  for (let i = 0; i < 8; i++) if (!pieces[i]) empty.push(i);
+  pieces[empty[n % 6]] = 'Q'; n = Math.floor(n / 6);
 
-      state.moveHistory.push(result.san);
+  // 3. الحصانان (توافيق C(5,2)=10)
+  const remaining = [];
+  for (let i = 0; i < 8; i++) if (!pieces[i]) remaining.push(i);
+  const combos = [];
+  for (let i = 0; i < 5; i++)
+    for (let j = i + 1; j < 5; j++)
+      combos.push([remaining[i], remaining[j]]);
+  const [k1, k2] = combos[n];
+  pieces[k1] = 'N'; pieces[k2] = 'N';
 
-      renderBoard();
-      updateStatus();
-      updateMoveList();
-      updateStats();
-      checkGameOver();
+  // 4. R K R في الثلاثة المتبقية
+  const last3 = [];
+  for (let i = 0; i < 8; i++) if (!pieces[i]) last3.push(i);
+  pieces[last3[0]] = 'R';
+  pieces[last3[1]] = 'K';
+  pieces[last3[2]] = 'R';
 
-      if (state.soundEnabled) playMoveSound();
-    } catch (e) {
-      console.error(e);
-    }
-  }
+  // 5. حقوق التقليع بصيغة ملفات القلاع (Chess960)
+  const rookFiles = [];
+  for (let i = 0; i < 8; i++) if (pieces[i] === 'R') rookFiles.push(String.fromCharCode(97 + i));
+  const castling =
+    rookFiles[1].toUpperCase() + rookFiles[0].toUpperCase() +
+    rookFiles[1] + rookFiles[0];
 
-  /* ==================== التراجع ==================== */
-  function undoMove() {
-    if (state.moveHistory.length === 0) return;
-    state.game.undo();
-    state.fen = state.game.fen();
-    state.moveHistory.pop();
-    state.selectedSquare = null;
-    state.legalMoves = [];
-    state.gameOver = false;
-    gameOverScreen.classList.remove('active');
-    if (state.moveCount > 0) state.moveCount--;
-    renderBoard();
-    updateStatus();
-    updateMoveList();
-    updateStats();
-  }
+  const row = pieces.join('');
+  return `${row.toLowerCase()}/pppppppp/8/8/8/8/PPPPPPPP/${row} w ${castling} - 0 1`;
+}
 
-  /* ==================== تحديث الحالة ==================== */
-  function updateStatus() {
-    if (!state.game) return;
+function renderBoard() {
+  if (!state.game) return;
+  const board = state.game.board();
+  boardEl.innerHTML = '';
+  const isWhite = state.orientation === 'white';
+  const rankOrder = isWhite ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
+  const fileOrder = isWhite ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
+
+  let checkSquare = null;
+  if (state.game.isCheck()) {
     const turn = state.game.turn();
-    if (state.game.isCheckmate()) {
-      statusText.textContent = t('checkmate');
-      statusText.style.color = 'var(--red-glow)';
-    } else if (state.game.isStalemate()) {
-      statusText.textContent = t('stalemate');
-    } else if (state.game.isCheck()) {
-      statusText.textContent = t('check');
-      statusText.style.color = 'var(--red-glow)';
-    } else {
-      statusText.textContent = turn === 'w' ? t('whiteTurn') : t('blackTurn');
-      statusText.style.color = 'var(--white-soft)';
+    for (let r = 0; r < 8; r++)
+      for (let c = 0; c < 8; c++)
+        if (board[r][c] && board[r][c].type === 'k' && board[r][c].color === turn)
+          checkSquare = { row: r, col: c };
+  }
+
+  for (const r of rankOrder) {
+    for (const c of fileOrder) {
+      const square = document.createElement('div');
+      const isLight = (r + c) % 2 === 0;
+      square.className = `square ${isLight ? 'light' : 'dark'}`;
+      square.dataset.row = r;
+      square.dataset.col = c;
+      square.dataset.square = String.fromCharCode(97 + c) + (8 - r);
+
+      if (state.lastMove &&
+         (state.lastMove.from === square.dataset.square || state.lastMove.to === square.dataset.square))
+        square.classList.add('last-move');
+      if (state.selectedSquare === square.dataset.square) square.classList.add('selected');
+      if (checkSquare && checkSquare.row === r && checkSquare.col === c) square.classList.add('check-king');
+
+      const piece = board[r][c];
+      if (piece) {
+        const span = document.createElement('span');
+        span.className = `piece ${piece.color === 'w' ? 'white' : 'black'}`;
+        span.textContent = PIECE_UNICODE[piece.color === 'w' ? piece.type.toUpperCase() : piece.type];
+        square.appendChild(span);
+      }
+
+      if (state.selectedSquare) {
+        const isLegal = state.legalMoves.some(m => m.to === square.dataset.square);
+        if (isLegal) {
+          square.classList.add('legal-move');
+          if (piece) square.classList.add('capture');
+        }
+      }
+
+      square.addEventListener('click', () => onSquareClick(square.dataset.square));
+      boardEl.appendChild(square);
     }
   }
 
-  function updateMoveList() {
-    moveListEl.innerHTML = '';
-    for (let i = 0; i < state.moveHistory.length; i += 2) {
-      const row = document.createElement('div');
-      row.className = 'move-row';
-      const num = Math.floor(i / 2) + 1;
-      const whiteMove = state.moveHistory[i] || '';
-      const blackMove = state.moveHistory[i + 1] || '';
-      row.innerHTML = `<span class="move-num">${num}.</span><span class="move-san">${whiteMove}</span><span class="move-san">${blackMove}</span>`;
-      moveListEl.appendChild(row);
-    }
-    moveListEl.scrollTop = moveListEl.scrollHeight;
-  }
+  const statsFen = document.getElementById('statsFen');
+  if (statsFen) statsFen.textContent = state.fen;
+}
 
-  function updateStats() {
-    statMoves.textContent = state.moveCount;
-    statPosition.textContent = state.positionId;
-    document.getElementById('statsTotal').textContent = state.moveCount;
-    document.getElementById('statsWhite').textContent = state.whiteMoves;
-    document.getElementById('statsBlack').textContent = state.blackMoves;
-  }
-
-  function checkGameOver() {
-    if (state.game.isCheckmate()) {
-      state.gameOver = true;
-      const turn = state.game.turn();
-      const winner = turn === 'w' ? 'black' : 'white';
-      gameOverTitle.textContent = t('checkmate');
-      gameOverSub.textContent = winner === 'white' ? t('whiteWins') : t('blackWins');
-      gameOverScreen.classList.add('active');
-    } else if (state.game.isStalemate()) {
-      state.gameOver = true;
-      gameOverTitle.textContent = t('stalemate');
-      gameOverSub.textContent = t('draw');
-      gameOverScreen.classList.add('active');
+function onSquareClick(square) {
+  if (state.gameOver) return;
+  if (state.selectedSquare) {
+    const move = state.legalMoves.find(m => m.to === square);
+    if (move) {
+      if (move.promotion) { showPromotionModal(move); return; }
+      executeMove(move); return;
     }
   }
-
-  /* ==================== لعبة جديدة ==================== */
-  function newGame(fen) {
-    let newFen = fen;
-    if (!newFen) {
-      // توليد موقع عشوائي 960
-      const randomId = Math.floor(Math.random() * 960);
-      newFen = generateChess960Fen(randomId);
-      state.positionId = randomId;
-    }
-    state.game = new Chess(newFen, { chess960: true }); // تفعيل وضع Chess 960
-    state.fen = state.game.fen();
-    state.moveHistory = [];
+  const piece = state.game.get(square);
+  if (piece && piece.color === state.game.turn()) {
+    state.selectedSquare = square;
+    state.legalMoves = state.game.moves({ square, verbose: true });
+  } else {
     state.selectedSquare = null;
     state.legalMoves = [];
-    state.lastMove = null;
-    state.gameOver = false;
-    state.moveCount = 0;
-    state.whiteMoves = 0;
-    state.blackMoves = 0;
-
-    gameOverScreen.classList.remove('active');
-    renderBoard();
-    updateStatus();
-    updateMoveList();
-    updateStats();
   }
+  renderBoard();
+}
 
-  function loadPositionById(id) {
-    if (id < 0 || id > 959) return;
-    const fen = generateChess960Fen(id);
-    state.positionId = id;
-    newGame(fen);
-  }
+let pendingPromotionMove = null;
+function showPromotionModal(move) {
+  pendingPromotionMove = move;
+  document.getElementById('promotionModal').classList.add('active');
+}
 
-  function playMoveSound() {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = 600;
-      gain.gain.setValueAtTime(0.1, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-      osc.start(); osc.stop(ctx.currentTime + 0.1);
-    } catch (e) {}
-  }
-
-  /* ==================== ربط الأحداث ==================== */
-  document.getElementById('btnNewGame').addEventListener('click', () => newGame());
-  document.getElementById('btnNewRandom').addEventListener('click', () => newGame());
-  document.getElementById('btnPlayAgain').addEventListener('click', () => newGame());
-
-  document.getElementById('btnFlip').addEventListener('click', () => {
-    state.orientation = state.orientation === 'white' ? 'black' : 'white';
-    renderBoard();
-  });
-
-  document.getElementById('btnUndo').addEventListener('click', undoMove);
-
-  document.getElementById('btnSettings').addEventListener('click', () => {
-    document.getElementById('settingsModal').classList.add('active');
-  });
-  document.getElementById('btnCloseSettings').addEventListener('click', () => {
-    document.getElementById('settingsModal').classList.remove('active');
-  });
-
-  document.getElementById('btnStats').addEventListener('click', () => {
-    document.getElementById('statsModal').classList.add('active');
-  });
-  document.getElementById('btnCloseStats').addEventListener('click', () => {
-    document.getElementById('statsModal').classList.remove('active');
-  });
-
-  document.getElementById('langToggle').addEventListener('click', function() {
-    this.classList.toggle('on');
-    state.lang = this.classList.contains('on') ? 'ar' : 'en';
-    updateI18n();
-  });
-
-  document.getElementById('soundToggle').addEventListener('click', function() {
-    this.classList.toggle('on');
-    state.soundEnabled = this.classList.contains('on');
-  });
-
-  document.getElementById('btnLoadPos').addEventListener('click', () => {
-    const id = parseInt(document.getElementById('posInput').value);
-    if (!isNaN(id) && id >= 0 && id <= 959) {
-      loadPositionById(id);
-      document.getElementById('settingsModal').classList.remove('active');
+document.querySelectorAll('.promo-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (pendingPromotionMove) {
+      const move = state.game.moves({ verbose: true }).find(m =>
+        m.from === pendingPromotionMove.from &&
+        m.to === pendingPromotionMove.to &&
+        m.promotion === btn.dataset.piece);
+      if (move) executeMove(move);
     }
+    document.getElementById('promotionModal').classList.remove('active');
+    pendingPromotionMove = null;
   });
+});
 
-  document.querySelectorAll('.modal-overlay').forEach(overlay => {
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.classList.remove('active');
-    });
-  });
+function executeMove(move) {
+  try {
+    const result = state.game.move({ from: move.from, to: move.to, promotion: move.promotion || 'q' });
+    if (!result) throw new Error('Invalid move');
+    state.fen = state.game.fen();
+    state.lastMove = { from: move.from, to: move.to };
+    state.selectedSquare = null;
+    state.legalMoves = [];
+    state.moveCount++;
+    (state.game.turn() === 'b') ? state.whiteMoves++ : state.blackMoves++;
+    state.moveHistory.push(result.san);
+    renderBoard(); updateStatus(); updateMoveList(); updateStats(); checkGameOver();
+    if (state.soundEnabled) playMoveSound();
+  } catch (e) { console.error(e); }
+}
 
-  /* ==================== التهيئة ==================== */
-  function init() {
-    newGame();
-    updateI18n();
+function undoMove() {
+  if (state.moveHistory.length === 0) return;
+  state.game.undo();
+  state.fen = state.game.fen();
+  state.moveHistory.pop();
+  state.selectedSquare = null; state.legalMoves = [];
+  state.gameOver = false;
+  gameOverScreen.classList.remove('active');
+  if (state.moveCount > 0) state.moveCount--;
+  renderBoard(); updateStatus(); updateMoveList(); updateStats();
+}
+
+function updateStatus() {
+  if (!state.game) return;
+  if (state.game.isCheckmate()) {
+    statusText.textContent = t('checkmate');
+    statusText.style.color = 'var(--red-glow)';
+  } else if (state.game.isStalemate()) {
+    statusText.textContent = t('stalemate');
+  } else if (state.game.isCheck()) {
+    statusText.textContent = t('check');
+    statusText.style.color = 'var(--red-glow)';
+  } else {
+    statusText.textContent = state.game.turn() === 'w' ? t('whiteTurn') : t('blackTurn');
+    statusText.style.color = 'var(--white-soft)';
   }
+}
 
-  init();
-  window.addEventListener('resize', renderBoard);
-      </script>
+function updateMoveList() {
+  moveListEl.innerHTML = '';
+  for (let i = 0; i < state.moveHistory.length; i += 2) {
+    const row = document.createElement('div');
+    row.className = 'move-row';
+    const num = Math.floor(i / 2) + 1;
+    const w = state.moveHistory[i] || '';
+    const b = state.moveHistory[i + 1] || '';
+    row.innerHTML = `<span class="move-num">${num}.</span><span class="move-san">${w}</span><span class="move-san">${b}</span>`;
+    moveListEl.appendChild(row);
+  }
+  moveListEl.scrollTop = moveListEl.scrollHeight;
+}
+
+function updateStats() {
+  statMoves.textContent = state.moveCount;
+  statPosition.textContent = state.positionId;
+  document.getElementById('statsTotal').textContent = state.moveCount;
+  document.getElementById('statsWhite').textContent = state.whiteMoves;
+  document.getElementById('statsBlack').textContent = state.blackMoves;
+}
+
+function checkGameOver() {
+  if (state.game.isCheckmate()) {
+    state.gameOver = true;
+    const winner = state.game.turn() === 'w' ? 'black' : 'white';
+    gameOverTitle.textContent = t('checkmate');
+    gameOverSub.textContent = winner === 'white' ? t('whiteWins') : t('blackWins');
+    gameOverScreen.classList.add('active');
+  } else if (state.game.isStalemate()) {
+    state.gameOver = true;
+    gameOverTitle.textContent = t('stalemate');
+    gameOverSub.textContent = t('draw');
+    gameOverScreen.classList.add('active');
+  }
+}
+
+function newGame(fen) {
+  let newFen = fen;
+  if (!newFen) {
+    const randomId = Math.floor(Math.random() * 960);
+    newFen = generateChess960Fen(randomId);
+    state.positionId = randomId;
+  }
+  state.game = new Chess(newFen, { chess960: true });
+  state.fen = state.game.fen();
+  state.moveHistory = [];
+  state.selectedSquare = null;
+  state.legalMoves = [];
+  state.lastMove = null;
+  state.gameOver = false;
+  state.moveCount = 0;
+  state.whiteMoves = 0;
+  state.blackMoves = 0;
+  gameOverScreen.classList.remove('active');
+  renderBoard(); updateStatus(); updateMoveList(); updateStats();
+}
+
+function loadPositionById(id) {
+  if (id < 0 || id > 959) return;
+  const fen = generateChess960Fen(id);
+  state.positionId = id;
+  newGame(fen);
+}
+
+function playMoveSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 600;
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+    osc.start(); osc.stop(ctx.currentTime + 0.1);
+  } catch (e) {}
+}
+
+/* الأحداث */
+document.getElementById('btnNewGame').addEventListener('click', () => newGame());
+document.getElementById('btnNewRandom').addEventListener('click', () => newGame());
+document.getElementById('btnPlayAgain').addEventListener('click', () => newGame());
+document.getElementById('btnFlip').addEventListener('click', () => {
+  state.orientation = state.orientation === 'white' ? 'black' : 'white';
+  renderBoard();
+});
+document.getElementById('btnUndo').addEventListener('click', undoMove);
+document.getElementById('btnSettings').addEventListener('click', () =>
+  document.getElementById('settingsModal').classList.add('active'));
+document.getElementById('btnCloseSettings').addEventListener('click', () =>
+  document.getElementById('settingsModal').classList.remove('active'));
+document.getElementById('btnStats').addEventListener('click', () =>
+  document.getElementById('statsModal').classList.add('active'));
+document.getElementById('btnCloseStats').addEventListener('click', () =>
+  document.getElementById('statsModal').classList.remove('active'));
+
+document.getElementById('langToggle').addEventListener('click', function () {
+  this.classList.toggle('on');
+  state.lang = this.classList.contains('on') ? 'ar' : 'en';
+  updateI18n();
+});
+document.getElementById('soundToggle').addEventListener('click', function () {
+  this.classList.toggle('on');
+  state.soundEnabled = this.classList.contains('on');
+});
+document.getElementById('btnLoadPos').addEventListener('click', () => {
+  const id = parseInt(document.getElementById('posInput').value);
+  if (!isNaN(id) && id >= 0 && id <= 959) {
+    loadPositionById(id);
+    document.getElementById('settingsModal').classList.remove('active');
+  }
+});
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.classList.remove('active');
+  });
+});
+
+/* التهيئة */
+newGame(generateChess960Fen(518));   // يبدأ بموقع 518 (= الوضع التقليدي)
+state.positionId = 518;
+updateI18n();
+window.addEventListener('resize', renderBoard);
+</script>
+</body>
+  </html>
